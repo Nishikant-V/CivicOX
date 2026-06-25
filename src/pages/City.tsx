@@ -4,12 +4,14 @@ import { geocodeCity, type GeoResult } from '../services/geocoding';
 import { getWeather, type WeatherResult } from '../services/weather';
 import { getAqi, type AqiResult } from '../services/aqi';
 import { getNearbyPlaces, type Place } from '../services/places';
+import { getCityNews, type NewsArticle } from '../services/news';
 import CityMap from '../components/CityMap';
 
 type GeoStatus = 'loading' | 'success' | 'error' | 'not-found';
 type WeatherStatus = 'loading' | 'success' | 'error';
 type AqiStatus = 'loading' | 'success' | 'error' | 'no-data';
 type PlacesStatus = 'loading' | 'success' | 'error';
+type NewsStatus = 'loading' | 'success' | 'error';
 
 const City: React.FC = () => {
   const { cityName } = useParams<{ cityName: string }>();
@@ -30,6 +32,10 @@ const City: React.FC = () => {
   const [places, setPlaces] = useState<Place[]>([]);
   const [placesError, setPlacesError] = useState('');
 
+  const [newsStatus, setNewsStatus] = useState<NewsStatus>('loading');
+  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [newsError, setNewsError] = useState('');
+
   useEffect(() => {
     if (!cityName) return;
 
@@ -49,6 +55,9 @@ const City: React.FC = () => {
     setPlacesStatus('loading');
     setPlaces([]);
     setPlacesError('');
+    setNewsStatus('loading');
+    setNews([]);
+    setNewsError('');
 
     geocodeCity(cityName, signal)
       .then((geo) => {
@@ -95,6 +104,17 @@ const City: React.FC = () => {
             if (err instanceof Error && err.name === 'AbortError') return;
             setPlacesError(err instanceof Error ? err.message : 'Unknown error');
             setPlacesStatus('error');
+          });
+
+        getCityNews(cityName, signal)
+          .then((n) => {
+            setNews(n);
+            setNewsStatus('success');
+          })
+          .catch((err: unknown) => {
+            if (err instanceof Error && err.name === 'AbortError') return;
+            setNewsError(err instanceof Error ? err.message : 'Unknown error');
+            setNewsStatus('error');
           });
       })
       .catch((err: unknown) => {
@@ -217,6 +237,34 @@ const City: React.FC = () => {
               <dt>PM10</dt>
               <dd>{aqi.pm10} µg/m³</dd>
             </dl>
+          )}
+        </>
+      )}
+
+      {/* ── Local News ── */}
+      {geoStatus === 'success' && (
+        <>
+          <h2>Local News</h2>
+
+          {newsStatus === 'loading' && <p>Loading local news…</p>}
+          {newsStatus === 'error' && <p>News error: {newsError}</p>}
+          {newsStatus === 'success' && news.length === 0 && (
+            <p>No recent news found for this city.</p>
+          )}
+
+          {newsStatus === 'success' && news.length > 0 && (
+            <ul>
+              {news.map((article, idx) => (
+                <li key={idx}>
+                  <strong>
+                    <a href={article.link} target="_blank" rel="noopener noreferrer">
+                      {article.title}
+                    </a>
+                  </strong>{' '}
+                  — {article.source} ({article.publishedDate})
+                </li>
+              ))}
+            </ul>
           )}
         </>
       )}
